@@ -10,16 +10,19 @@ import {
 import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 // Load environment variables
 dotenv.config();
 
 // Import types
-import { ArxivEntry, SearchResult } from './types/index.js';
+import { ArxivEntry, SearchResult, ArxivCategories } from './types/index.js';
 
 // Import utilities
 import logger from './utils/logger.js';
 import { NetworkError, ValidationError, retryWithBackoff } from './utils/errors.js';
+import { readJsonFile } from './utils/fileUtils.js';
 
 // Import managers
 import { storageManager } from './storage/storageManager.js';
@@ -358,6 +361,19 @@ class ArxivServer {
             required: ['arxivId', 'promptId'],
           },
         },
+        {
+          name: 'get_arxiv_categories',
+          description: 'Get arXiv category information. If no group is specified, returns all group names. If a group is specified, returns detailed information for that group.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              group: {
+                type: 'string',
+                description: 'Optional. The group name to get detailed category information for.',
+              },
+            },
+          },
+        },
       ],
     }));
 
@@ -390,6 +406,8 @@ class ArxivServer {
             return await this.getAnalysisPrompts();
           case 'analyze_paper':
             return await this.analyzePaper(args);
+          case 'get_arxiv_categories':
+            return await this.getArxivCategories(args);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -787,6 +805,72 @@ class ArxivServer {
         },
       ],
     };
+  }
+
+  private async getArxivCategories(args: any) {
+    try {
+      // Get the directory name for resolving the JSON file path
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      
+      // Read the category data from file
+      const categoryFilePath = join(__dirname, '../prompts/arxiv_categories.json');
+      const categoryData = await readJsonFile<ArxivCategories>(categoryFilePath);
+      
+      if (!categoryData) {
+        throw new NetworkError('Failed to read category data');
+      }
+      
+      const categories = categoryData.categories;
+
+      // If no group specified, return all group names
+      if (!args.group) {
+        const groupNames = categories.map((categoryGroup) => ({
+          group: categoryGroup.group
+        }));
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                totalGroups: groupNames.length,
+                groups: groupNames
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      // If group specified, return detailed information for that group
+      const group = categories.find((categoryGroup) => 
+        categoryGroup.group.toLowerCase() === args.group.toLowerCase()
+      );
+
+      if (!group) {
+        throw new ValidationError(`Group '${args.group}' not found`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              group: group.group,
+              totalCategories: group.categories.length,
+              categories: group.categories.map((category) => ({
+                id: category.id,
+                name: category.name,
+                description: category.description
+              }))
+            }, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      logger.error('Error reading category data:', error);
+      throw new NetworkError('Failed to read category data');
+    }
   }
 
   async run() {

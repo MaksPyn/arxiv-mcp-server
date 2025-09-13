@@ -54,3 +54,18 @@ export interface PaperContent {
   };
   fullText: string;
 }
+
+export interface ArxivCategory {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface ArxivCategoryGroup {
+  group: string;
+  categories: ArxivCategory[];
+}
+
+export interface ArxivCategories {
+  categories: ArxivCategoryGroup[];
+}

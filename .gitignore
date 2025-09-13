@@ -1,9 +1,11 @@
 # Dependencies
 node_modules/
+pnpm-lock.yaml
 
 # Build output
 build/
 dist/
+storage/
 
 # Environment files
 .env
