@@ -90,6 +90,12 @@ test('query: fields, phrases, categories and date ranges', () => {
   assert.equal(buildSearchQuery({ query: 'ti:a OR ti:b', author: 'X' }), '(ti:a OR ti:b) AND au:X');
 });
 
+test('query: stopwords are dropped from unquoted terms but kept in phrases', () => {
+  assert.equal(buildSearchQuery({ title: 'attention is all you need' }), '(ti:attention AND ti:need)');
+  assert.equal(buildSearchQuery({ title: '"attention is all you need"' }), 'ti:"attention is all you need"');
+  assert.equal(buildSearchQuery({ all: 'the' }), 'all:the');
+});
+
 test('query: user input cannot inject syntax', () => {
   assert.deepEqual(tokenize('foo) OR (bar AND'), ['foo', 'bar']);
   assert.equal(buildSearchQuery({ author: 'Smith" OR au:"Jones' }), 'au:"Smith OR au: Jones"');
