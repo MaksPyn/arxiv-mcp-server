@@ -20,8 +20,27 @@ export interface SearchParams {
   submittedTo?: string;
 }
 
-/** Split text into search terms, keeping "quoted phrases" together and dropping syntax characters. */
+/**
+ * Common words arXiv's search index does not store. Requiring one of them
+ * (e.g. `ti:is`) makes an AND query match nothing, so they are dropped from
+ * unquoted terms. Dropping an indexed word only broadens the search slightly.
+ */
+const STOPWORDS = new Set(
+  (
+    'a an and are as at be been but by can do does for from has have how if in into is it its no not of on or our ' +
+    'such that the their then there these they this to was we what when which why will with all you your'
+  ).split(' '),
+);
+
+/** Split text into search terms, keeping "quoted phrases" together and dropping syntax characters and stopwords. */
 export function tokenize(text: string): string[] {
+  const all = splitTerms(text);
+  const meaningful = all.filter((t) => t.startsWith('"') || !STOPWORDS.has(t.toLowerCase()));
+  // If the user typed only stopwords, keep them rather than produce an empty query.
+  return meaningful.length ? meaningful : all;
+}
+
+function splitTerms(text: string): string[] {
   const terms: string[] = [];
   for (const m of text.matchAll(/"([^"]+)"|(\S+)/g)) {
     const raw = (m[1] ?? m[2] ?? '').replace(/[()"\[\]]/g, ' ').replace(/\s+/g, ' ').trim();

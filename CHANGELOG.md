@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1
+
+### Fixed
+- Multi-word `title`, `abstract` and `all` searches containing common words returned nothing. For example, "attention is all you need" found 0 papers, because arXiv does not index words like "is", so a required `ti:is` never matches. Such words are now dropped from unquoted terms. Quoted phrases are unchanged.
+
 ## 2.0.0
 
 A rewrite on the current MCP SDK (`McpServer`, zod schemas, tool annotations, MCP prompts).
