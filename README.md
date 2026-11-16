@@ -1,390 +1,166 @@
 # arXiv MCP Server
 
-An enhanced Model Context Protocol (MCP) server that provides comprehensive access to arXiv for searching, downloading, reading, and analyzing scientific papers with AI-powered research prompts.
+A [Model Context Protocol](https://modelcontextprotocol.io) server that gives AI assistants access to [arXiv](https://arxiv.org): search papers, browse the official category taxonomy, and read papers' full text.
 
-## Overview
+- **Search** by keywords, title, author, abstract, category and submission date, with paging and sorting
+- **Category taxonomy**: all 155 official arXiv categories (`cs.AI`, `math.CO`, `astro-ph.CO`, …) with descriptions
+- **Full text**: `read_paper` downloads the PDF, extracts the text, detects sections, and returns it in chunks you can page through or jump into by section
+- **In-paper search**: find every occurrence of a phrase, with context and section names
+- **Local library**: downloaded papers are kept on disk and can be listed and deleted
+- **Analysis prompts**: summary, key findings, methodology critique, literature-review entry and more, available as MCP prompts and as a tool
+- **Polite to arXiv**: all requests share one queue with a 3-second gap, retry with backoff, and cache responses for a short time
 
-This MCP server enables AI assistants to not only search and retrieve scientific papers from arXiv but also download them locally, extract content, and generate research-oriented analysis prompts. Perfect for researchers, students, and anyone working with academic literature.
+## Requirements
 
-## Features
-
-### Core Features
-- **Search papers** by title, author, abstract, category, or any combination
-- **Retrieve papers** by their arXiv ID
-- **Get recent papers** in specific categories
-- **Find all papers** by a specific author
-- **Rate limiting** compliance with arXiv API guidelines
-
-### Enhanced Features (v1.1.0)
-- **📥 Paper Download & Storage**: Download and store papers locally with metadata tracking
-- **📖 PDF Content Reading**: Extract and read text content from downloaded papers
-- **🔍 In-Paper Search**: Search for specific terms within downloaded papers
-- **🤖 AI Research Prompts**: Pre-configured analysis prompts for paper summarization, methodology analysis, and more
-- **📊 Storage Management**: Track storage usage and manage downloaded papers
-- **🔧 Enhanced Error Handling**: Robust error handling with retry logic
-- **📝 Structured Logging**: Winston-based logging with configurable levels
+Node.js 22 or newer.
 
 ## Installation
 
-### Prerequisites
+### Run straight from GitHub (no clone)
 
-- Node.js (v16 or higher)
-- npm or yarn
-
-### Option 1: Install from npm
-
-```bash
-npm install -g @arxiv/mcp-server
+```json
+{
+  "mcpServers": {
+    "arxiv": {
+      "command": "npx",
+      "args": ["-y", "github:MaksPyn/arxiv-mcp-server"]
+    }
+  }
+}
 ```
 
-Then run:
-```bash
-arxiv-mcp-server
-```
+### From source
 
-### Option 2: Install from Source
-
-1. Clone this repository:
 ```bash
 git clone https://github.com/MaksPyn/arxiv-mcp-server.git
 cd arxiv-mcp-server
+npm install        # also builds into build/
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
+Then point your MCP client at `build/index.js`.
 
-3. Build the TypeScript code:
-```bash
-npm run build
-```
-
-### Option 3: Docker
-
-1. Using Docker Compose:
-```bash
-cd docker
-docker-compose up -d
-```
-
-2. Using Docker directly:
-```bash
-docker build -t arxiv-mcp-server -f docker/Dockerfile .
-docker run -it --name arxiv-mcp-server arxiv-mcp-server
-```
-
-### Configuration
-
-Copy the example environment file and customize as needed:
-```bash
-cp config/.env.example .env
-```
-
-Available configuration options:
-- `LOG_LEVEL`: Logging level (debug, info, warn, error)
-- `STORAGE_DIR`: Directory for storing downloaded papers
-- `MAX_STORAGE_SIZE_MB`: Maximum storage size for papers
-- `RATE_LIMIT_DELAY_MS`: Delay between API requests (default: 3000ms)
-
-## Usage
-
-### Running the Server
-
-Start the server using:
-```bash
-npm start
-```
-
-Or for development (build + run):
-```bash
-npm run dev
-```
-
-### Integrating with Claude Desktop
-
-Add the following to your Claude Desktop configuration file:
-
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Linux**: `~/.config/claude/claude_desktop_config.json`
+**Claude Desktop**: edit `claude_desktop_config.json` (Settings → Developer → Edit Config):
 
 ```json
 {
   "mcpServers": {
     "arxiv": {
       "command": "node",
-      "args": ["C:/path/to/arxiv-server/build/index.js"]
+      "args": ["/absolute/path/to/arxiv-mcp-server/build/index.js"],
+      "env": {
+        "ARXIV_STORAGE_DIR": "/absolute/path/to/papers"
+      }
     }
   }
 }
 ```
 
-Replace `C:/path/to/arxiv-server` with the actual path to your arxiv-server directory.
+**Claude Code**:
 
-## Available Tools
+```bash
+claude mcp add arxiv -e ARXIV_STORAGE_DIR=~/papers -- node /absolute/path/to/arxiv-mcp-server/build/index.js
+```
 
-### 1. `search_papers`
+### Docker
 
-Search for papers using various criteria.
+```bash
+docker build -t arxiv-mcp-server -f docker/Dockerfile .
+```
 
-**Parameters:**
-- `query` (string, optional): Raw search query
-- `title` (string, optional): Search in paper titles
-- `author` (string, optional): Search by author name
-- `abstract` (string, optional): Search in abstracts
-- `category` (string, optional): Filter by category (e.g., "cs.AI", "math.CO")
-- `all` (string, optional): Search in all fields
-- `start` (number, optional): Starting index (default: 0)
-- `maxResults` (number, optional): Maximum results to return, max 2000 (default: 10)
-- `sortBy` (string, optional): Sort by "relevance", "lastUpdatedDate", or "submittedDate" (default: "relevance")
-- `sortOrder` (string, optional): "ascending" or "descending" (default: "descending")
-
-**Example:**
 ```json
 {
-  "title": "neural networks",
-  "category": "cs.AI",
-  "maxResults": 5
+  "mcpServers": {
+    "arxiv": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "arxiv-data:/data", "arxiv-mcp-server"]
+    }
+  }
 }
 ```
 
-### 2. `get_paper_by_id`
+## Configuration
 
-Retrieve specific papers by their arXiv IDs.
+Settings come from environment variables. The easiest place to set them is the `env` block of your MCP client config (see above). You can also use a `.env` file. The server looks for one in these places, highest priority first:
 
-**Parameters:**
-- `ids` (array of strings, required): Array of arXiv IDs
+1. the file named by `ARXIV_MCP_ENV_FILE`
+2. `.env` in the working directory the client launched the server from
+3. `.env` in the project root (next to `package.json`)
 
-**Example:**
-```json
-{
-  "ids": ["2301.00001", "2312.12345"]
-}
-```
+Variables set by the client always override `.env` files. Relative paths in a `.env` file are resolved against that file's directory. When the server starts, it logs the storage directory in use and which `.env` files it loaded. `list_downloaded_papers` also shows the storage directory.
 
-### 3. `get_recent_papers`
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ARXIV_STORAGE_DIR` (or `STORAGE_DIR`) | `~/.arxiv-mcp-server/papers` | Where PDFs and extracted text are stored |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` or `silent`. Logs go to stderr |
+| `LOG_FILE` | – | Also append logs to this file |
+| `RATE_LIMIT_DELAY_MS` | `3000` | Minimum gap between requests to arXiv |
+| `REQUEST_TIMEOUT_MS` | `20000` | Per-request timeout for API calls |
+| `MAX_PDF_SIZE_MB` | `50` | Refuse larger PDFs (`0` = no limit) |
+| `MAX_STORAGE_SIZE_MB` | `0` | Refuse downloads once storage exceeds this (`0` = no limit) |
+| `PROMPTS_FILE` | – | JSON file with extra or overriding analysis prompts |
 
-Get the most recent papers in a specific category.
+See [`config/.env.example`](config/.env.example).
 
-**Parameters:**
-- `category` (string, required): Category to filter by (e.g., "cs.AI", "physics.quant-ph")
-- `maxResults` (number, optional): Maximum results (default: 10)
+## Tools
 
-**Example:**
-```json
-{
-  "category": "cs.LG",
-  "maxResults": 20
-}
-```
+| Tool | What it does |
+| --- | --- |
+| `search_papers` | Search with any of `all`, `title`, `author`, `abstract`, `categories`, `submittedFrom`/`submittedTo`, or a raw arXiv `query`. Supports `sortBy`, `sortOrder`, `start`, `maxResults` (≤ 200) and `fullAbstracts` |
+| `get_papers` | Full metadata for one or more IDs or arxiv.org URLs (new-style `2301.00001v2` and old-style `hep-th/9901001`) |
+| `get_recent_papers` | Newest submissions in one or more categories |
+| `list_categories` | The arXiv category taxonomy, filterable by `group` (`cs`, `math`, `physics`, `astro-ph`, …) and `search` text |
+| `read_paper` | Full text of a paper, downloaded automatically. Page with `offset`/`maxChars`, or jump with `section` (`"Introduction"`, `"3.2"`, `"conclusion"`) |
+| `search_in_paper` | Every occurrence of a word or phrase, with context and section names. Plain-text match, not regex |
+| `download_paper` | Download a PDF ahead of time (`force` to re-download) |
+| `list_downloaded_papers` | Local library, storage usage and storage directory |
+| `delete_paper` | Remove a paper from local storage |
+| `analyze_paper` | A filled-in research-analysis brief. Omit `promptId` to list the available analyses |
 
-### 4. `search_author`
+### Search tips
 
-Find all papers by a specific author.
+- Words in `title`/`abstract`/`all` must all match. Use `"double quotes"` for an exact phrase.
+- `categories` takes one code or a list (matched with OR). Whole archives such as `math` or `cond-mat` also work. Unknown codes are rejected with suggestions.
+- Dates accept `YYYY`, `YYYY-MM` or `YYYY-MM-DD`.
+- `query` takes raw [arXiv query syntax](https://info.arxiv.org/help/api/user-manual.html#query_details), e.g. `ti:"diffusion model" ANDNOT cat:cs.CV`, and is combined with the other fields using AND.
 
-**Parameters:**
-- `author` (string, required): Author name to search for
-- `maxResults` (number, optional): Maximum results (default: 20)
-- `sortBy` (string, optional): "submittedDate" or "lastUpdatedDate" (default: "submittedDate")
+## Prompts
 
-**Example:**
-```json
-{
-  "author": "Yann LeCun",
-  "maxResults": 10
-}
-```
+Each template in [`prompts/prompts.json`](prompts/prompts.json) is exposed as an MCP prompt that takes an `arxivId`: `summary`, `key_findings`, `methodology_analysis`, `literature_review`, `research_gaps`, `technical_deep_dive`, `comparison`, `practical_applications`. In clients that support prompts, such as Claude Desktop and Claude Code, they show up as slash commands or attachments.
 
-### 5. `download_paper`
-
-Download a paper PDF and store it locally.
-
-**Parameters:**
-- `arxivId` (string, required): arXiv ID of the paper to download
-
-**Example:**
-```json
-{
-  "arxivId": "2301.00001"
-}
-```
-
-### 6. `list_downloaded_papers`
-
-List all locally downloaded papers with metadata.
-
-**Parameters:** None
-
-### 7. `delete_paper`
-
-Delete a downloaded paper from local storage.
-
-**Parameters:**
-- `arxivId` (string, required): arXiv ID of the paper to delete
-
-### 8. `get_storage_stats`
-
-Get storage statistics for downloaded papers.
-
-**Parameters:** None
-
-**Returns:**
-- Total number of papers
-- Total storage size
-- Formatted size string
-
-### 9. `read_paper_content`
-
-Read and extract text content from a downloaded paper.
-
-**Parameters:**
-- `arxivId` (string, required): arXiv ID of the paper to read
-
-**Returns:**
-- Extracted sections (abstract, introduction, methodology, results, discussion, conclusion, references)
-- Full text length
-
-### 10. `search_in_paper`
-
-Search for text within a downloaded paper.
-
-**Parameters:**
-- `arxivId` (string, required): arXiv ID of the paper to search in
-- `searchTerm` (string, required): Text to search for
-- `caseSensitive` (boolean, optional): Whether the search should be case sensitive (default: false)
-
-**Returns:**
-- Total matches found
-- Matches organized by section with context
-
-### 11. `get_analysis_prompts`
-
-Get available research analysis prompts.
-
-**Parameters:** None
-
-**Returns:**
-- List of available prompts with IDs, names, descriptions, and required variables
-
-### 12. `analyze_paper`
-
-Generate an analysis prompt for a paper.
-
-**Parameters:**
-- `arxivId` (string, required): arXiv ID of the paper to analyze
-- `promptId` (string, required): ID of the analysis prompt to use
-
-**Available Prompt IDs:**
-- `summary`: Comprehensive paper summary
-- `key_findings`: Extract key findings and results
-- `methodology_analysis`: Analyze research methodology
-- `literature_review`: Create literature review entry
-- `research_gaps`: Identify research gaps and future directions
-- `technical_deep_dive`: Technical analysis with algorithms and implementation details
-- `comparison`: Compare with related work
-- `practical_applications`: Identify real-world applications
-
-**Example:**
-```json
-{
-  "arxivId": "2301.00001",
-  "promptId": "summary"
-}
-```
-
-## arXiv Categories
-
-Common arXiv category codes include:
-
-### Computer Science
-- `cs.AI` - Artificial Intelligence
-- `cs.LG` - Machine Learning
-- `cs.CV` - Computer Vision and Pattern Recognition
-- `cs.CL` - Computation and Language
-- `cs.NE` - Neural and Evolutionary Computing
-
-### Physics
-- `physics.gen-ph` - General Physics
-- `physics.optics` - Optics
-- `quant-ph` - Quantum Physics
-
-### Mathematics
-- `math.CO` - Combinatorics
-- `math.PR` - Probability
-- `math.ST` - Statistics Theory
-
-For a complete list, visit [arXiv Category Taxonomy](https://arxiv.org/category_taxonomy).
-
-## Response Format
-
-All tools return structured JSON responses containing:
-- Paper IDs
-- Titles
-- Authors (with affiliations when available)
-- Publication/update dates
-- Categories
-- Summaries (truncated for search results, full for specific paper retrieval)
-- Direct PDF links
-- Additional metadata (DOI, journal references, comments)
-
-## Rate Limiting
-
-This server respects arXiv's API usage guidelines by implementing a 3-second delay between requests. This is handled automatically and ensures compliance with arXiv's terms of service.
-
-## Error Handling
-
-The server includes comprehensive error handling for:
-- Network errors
-- Invalid parameters
-- Rate limiting
-- arXiv API errors
-
-Errors are returned in a structured format that can be easily parsed by the MCP client.
+To add your own, create a JSON file in the same format and set `PROMPTS_FILE`. Entries with the same `id` replace the built-in ones. Templates can use `{{id}}`, `{{title}}`, `{{authors}}`, `{{abstract}}`, `{{categories}}`, `{{primaryCategory}}`, `{{year}}`, `{{published}}`, `{{url}}`, `{{comment}}`, `{{journalRef}}` and `{{doi}}`.
 
 ## Development
 
-### Project Structure
-```
-arxiv-server/
-├── src/
-│   ├── index.ts              # Main server implementation
-│   ├── types/                # TypeScript type definitions
-│   ├── utils/                # Utility functions (logger, errors, file operations)
-│   ├── storage/              # Storage management for downloaded papers
-│   └── prompts/              # Research prompt management
-├── build/                    # Compiled JavaScript files
-├── storage/                  # Downloaded papers storage
-├── prompts/                  # Prompt templates
-├── logs/                     # Application logs
-├── config/                   # Configuration files
-├── docker/                   # Docker configuration
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── package.json              # Project dependencies
-├── tsconfig.json             # TypeScript configuration
-├── .npmignore                # NPM publish ignore rules
-└── README.md                 # This file
+```bash
+npm run build     # compile to build/
+npm test          # offline unit tests
+npm run smoke     # end-to-end test against the live arXiv API
+node scripts/update-categories.mjs   # refresh the category list from arxiv.org
 ```
 
-### Building from Source
-```bash
-npm run build
+```
+src/
+  index.ts            entry point (stdio transport)
+  server.ts           tool and prompt definitions
+  config.ts           environment / .env loading
+  logger.ts           stderr logger
+  arxiv/api.ts        Atom API client and parser
+  arxiv/http.ts       rate-limited, retrying fetch
+  arxiv/query.ts      search query builder
+  arxiv/ids.ts        arXiv ID parsing and validation
+  arxiv/categories.*  category taxonomy
+  storage.ts          local paper storage
+  pdf.ts              PDF text extraction, section detection, search
+  reader.ts           download, extract and cache
+  prompts.ts          analysis prompt templates
 ```
 
-### Running in Development Mode
-```bash
-npm run dev
-```
+## Notes
+
+- arXiv asks API users to keep to one request every 3 seconds. If you send too many, arXiv answers with HTTP 429 for a while. The server reports this clearly, and papers you've already downloaded can still be read.
+- Text is extracted from the PDF, so equations, tables and figures come through imperfectly.
+- Section detection is heuristic. If a section isn't found, the error lists the detected sections, and you can always read by `offset`.
 
 ## License
 
-MIT License - see package.json for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
-## Acknowledgments
-
-This server uses the [arXiv API](https://arxiv.org/help/api/) to access scientific papers. Please respect arXiv's terms of service and usage guidelines when using this server.
+MIT. Thanks to arXiv for use of its open-access interoperability.

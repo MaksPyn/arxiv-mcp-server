@@ -1,32 +1,17 @@
-version: '3.8'
-
+# MCP servers talk over stdio, so they are normally launched by the MCP client
+# (see README) rather than run as a long-lived service. This file is mainly a
+# convenient way to build the image:  docker compose -f docker/docker-compose.yml build
 services:
   arxiv-mcp-server:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: arxiv-mcp-server
-    restart: unless-stopped
+    image: arxiv-mcp-server
+    stdin_open: true
     environment:
-      - NODE_ENV=production
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
-      # Persist storage and logs
-      - arxiv-storage:/app/storage
-      - arxiv-logs:/app/logs
-      # Optional: Mount custom prompts
-      - ./custom-prompts:/app/prompts:ro
-    stdin_open: true
-    tty: true
-    networks:
-      - mcp-network
+      - arxiv-data:/data
 
 volumes:
-  arxiv-storage:
-    driver: local
-  arxiv-logs:
-    driver: local
-
-networks:
-  mcp-network:
-    driver: bridge
+  arxiv-data:
