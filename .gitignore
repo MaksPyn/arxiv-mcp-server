@@ -35,3 +35,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Local paper storage (if ARXIV_STORAGE_DIR points inside the repo)
+storage/

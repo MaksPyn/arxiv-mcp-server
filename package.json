@@ -1,65 +1,57 @@
 {
-  "name": "@arxiv/mcp-server",
-  "version": "1.1.0",
-  "description": "Enhanced MCP server for arXiv - search, download, read, and analyze scientific papers with AI-powered research prompts",
-  "main": "build/index.js",
+  "name": "arxiv-mcp-server",
+  "version": "2.0.0",
+  "description": "MCP server for arXiv: search papers, browse the category taxonomy, download PDFs and read their full text",
   "type": "module",
+  "main": "build/index.js",
   "bin": {
-    "arxiv-mcp-server": "./start.js"
+    "arxiv-mcp-server": "build/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').chmodSync('build/index.js', 0o755)\"",
+    "prepare": "npm run build",
     "start": "node build/index.js",
-    "dev": "tsc && node build/index.js",
-    "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "smoke": "npm run build && node scripts/smoke.mjs"
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "arxiv",
     "research",
     "papers",
-    "api",
     "pdf",
-    "analysis",
-    "ai",
-    "scientific-papers",
-    "model-context-protocol"
+    "scientific-papers"
   ],
   "author": "MaksPyn",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MaksPyn/arxiv-mcp-server.git"
+    "url": "git+https://github.com/MaksPyn/arxiv-mcp-server.git"
   },
   "bugs": {
     "url": "https://github.com/MaksPyn/arxiv-mcp-server/issues"
   },
   "homepage": "https://github.com/MaksPyn/arxiv-mcp-server#readme",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=22.0.0"
   },
   "files": [
     "build/",
     "prompts/",
-    "start.js",
     "README.md",
     "LICENSE"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "axios": "^1.7.0",
-    "dotenv": "^17.2.1",
-    "node-fetch": "^2.7.0",
-    "pdf-parse": "^1.1.1",
-    "winston": "^3.17.0",
-    "xml2js": "^0.6.2"
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "fast-xml-parser": "^5.12.1",
+    "unpdf": "^1.9.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/node-fetch": "^2.6.12",
-    "@types/pdf-parse": "^1.1.5",
-    "@types/xml2js": "^0.4.14",
-    "typescript": "^5.0.0"
+    "@types/node": "^22.19.0",
+    "typescript": "^5.9.3"
   }
 }
